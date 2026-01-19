@@ -1,1 +1,0 @@
-python3 batch_shrink.py ./input ./output --max-edge 4000 --quality 80 --strip
