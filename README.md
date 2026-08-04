@@ -89,6 +89,7 @@
 |高质量归档 | `python batch_shrink.py input output --max-edge 6000 --quality 85` |
 |社交媒体推荐参数 | `python batch_shrink.py input output --max-edge 4096 --quality 80 --workers 8` |
 |手机分享版本 | `python batch_shrink.py input output --max-edge 2048 --quality 75` |
+|微信传播（JPEG，兼容安卓） | `python batch_shrink.py input output --out-format jpg --max-edge 3072 --quality 85 --strip` |
 
 # fix_photo_time.py 使用说明
 
