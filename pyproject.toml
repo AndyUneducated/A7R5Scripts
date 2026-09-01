@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vclip"
+version = "0.5.0"
+description = "通用视频切分 / 重组工具：按大小或时长切分，或把片段无损拼回一个视频（支持 iPhone 4K/HDR 及各类视频）"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "anning" }]
+keywords = ["ffmpeg", "video", "split", "merge", "concat", "hdr", "iphone"]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+vclip = "vclip.cli:main"
+
+[tool.setuptools]
+packages = ["vclip"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

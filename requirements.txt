@@ -1,4 +1,7 @@
 # Python 3.10+ required (PEP 604 type unions are used).
+# Photo shrink: Pillow / pillow-heif / rawpy / tqdm
+# Video: no Python deps; needs system ffmpeg / ffprobe
+# Time fix: system ExifTool
 Pillow>=10.0
 pillow-heif>=0.15
 rawpy>=0.19
