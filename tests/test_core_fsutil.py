@@ -2,7 +2,7 @@ import pathlib
 import tempfile
 import unittest
 
-from a7r5 import fsutil
+from mediakit.core import fsutil
 
 
 class NormalizeExtsTest(unittest.TestCase):

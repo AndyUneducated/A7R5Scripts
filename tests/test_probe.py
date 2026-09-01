@@ -1,6 +1,6 @@
 import json
 
-from vclip.probe import _fraction, format_duration, format_size
+from mediakit.video.probe import _fraction, format_duration, format_size
 from conftest import make_info, make_sdr_info
 
 

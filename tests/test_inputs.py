@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from vclip.inputs import natural_key, resolve_inputs
+from mediakit.video.inputs import natural_key, resolve_inputs
 
 
 def test_natural_key_orders_numerically():

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from vclip.split import (
+from mediakit.video.split import (
     _copy_cmd,
     _encode_seg_cmd,
     plan_duration,
@@ -10,7 +10,7 @@ from vclip.split import (
     plan_size,
     plan_trim,
 )
-from vclip.encode import build_plan
+from mediakit.video.encode import build_plan
 from conftest import make_caps, make_info, make_opts, make_sdr_info
 
 

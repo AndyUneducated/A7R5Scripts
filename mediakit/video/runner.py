@@ -34,9 +34,13 @@ def tool_path(tool: str) -> str:
     """定位 ffmpeg / ffprobe。
 
     支持用环境变量覆盖（如 CI / 非标准安装）：
-      VCLIP_FFMPEG / VCLIP_FFPROBE，或大写工具名 FFMPEG / FFPROBE。
+      MEDIAKIT_FFMPEG / MEDIAKIT_FFPROBE，旧名 VCLIP_*，或大写工具名 FFMPEG / FFPROBE。
     """
-    override = os.environ.get(f"VCLIP_{tool.upper()}") or os.environ.get(tool.upper())
+    override = (
+        os.environ.get(f"MEDIAKIT_{tool.upper()}")
+        or os.environ.get(f"VCLIP_{tool.upper()}")
+        or os.environ.get(tool.upper())
+    )
     if override:
         return override
     path = shutil.which(tool)

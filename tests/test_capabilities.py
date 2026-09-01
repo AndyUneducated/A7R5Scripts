@@ -1,4 +1,4 @@
-from vclip.capabilities import _names
+from mediakit.video.capabilities import _names
 from conftest import make_caps
 
 

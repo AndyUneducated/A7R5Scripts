@@ -1,20 +1,22 @@
 """测试公共夹具与工厂。
 
-通过 VCLIP_FFMPEG / VCLIP_FFPROBE 环境变量把二进制路径固定成占位字符串，
-让"构建命令 / 计划"类测试完全不依赖本机是否安装 ffmpeg（这些测试只检查
-生成的参数，不真正执行）。
+通过 MEDIAKIT_FFMPEG / MEDIAKIT_FFPROBE 环境变量把二进制路径固定成占位字符串，
+让「构建命令 / 计划」类测试完全不依赖本机是否安装 ffmpeg（这些测试只检查
+生成的参数，不真正执行）。也认旧名 VCLIP_*。
 """
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
+os.environ.setdefault("MEDIAKIT_FFMPEG", "ffmpeg")
+os.environ.setdefault("MEDIAKIT_FFPROBE", "ffprobe")
 os.environ.setdefault("VCLIP_FFMPEG", "ffmpeg")
 os.environ.setdefault("VCLIP_FFPROBE", "ffprobe")
 
-from vclip.capabilities import Capabilities  # noqa: E402
-from vclip.encode import EncodeOptions  # noqa: E402
-from vclip.probe import VideoInfo  # noqa: E402
+from mediakit.video.capabilities import Capabilities  # noqa: E402
+from mediakit.video.encode import EncodeOptions  # noqa: E402
+from mediakit.video.probe import VideoInfo  # noqa: E402
 
 
 def make_info(**kw) -> VideoInfo:

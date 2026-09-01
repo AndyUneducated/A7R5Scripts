@@ -1,4 +1,4 @@
-"""Decoding, resizing and encoding of A7R V images."""
+"""Decoding, resizing and encoding of photos (JPEG / HEIF / RAW)."""
 
 from __future__ import annotations
 

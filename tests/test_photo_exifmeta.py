@@ -3,7 +3,7 @@ import unittest
 
 from PIL import ExifTags, Image
 
-from a7r5 import exifmeta
+from mediakit.photo import exifmeta
 
 ORIENTATION = 0x0112
 MODEL = 0x0110

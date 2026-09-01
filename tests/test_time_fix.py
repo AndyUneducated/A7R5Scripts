@@ -2,7 +2,8 @@ import pathlib
 import tempfile
 import unittest
 
-import fix_photo_time as fpt
+from mediakit.cli import main as cli_main
+from mediakit.time import fix as fpt
 
 
 class ArgBuildingTest(unittest.TestCase):
@@ -101,25 +102,26 @@ class MainValidationTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
 
     def test_missing_shift_arguments(self):
-        code = fpt.main(["-i", str(self.root / "in")])
+        code = cli_main(["time", "-i", str(self.root / "in")])
         self.assertEqual(code, 2)
 
     def test_unsigned_offset_is_rejected(self):
-        code = fpt.main(
-            ["-i", str(self.root / "in"), "--from-offset=10:00", "--to-offset=-07:00"]
+        code = cli_main(
+            ["time", "-i", str(self.root / "in"), "--from-offset=10:00", "--to-offset=-07:00"]
         )
         self.assertEqual(code, 2)
 
     def test_zero_shift_without_offset_is_rejected(self):
-        code = fpt.main(["-i", str(self.root / "in"), "--shift", "+00:00:00"])
+        code = cli_main(["time", "-i", str(self.root / "in"), "--shift", "+00:00:00"])
         self.assertEqual(code, 2)
 
     def test_dry_run_does_not_copy(self):
         src = self.root / "in" / "a.arw"
         src.write_bytes(b"raw")
 
-        code = fpt.main(
+        code = cli_main(
             [
+                "time",
                 "-i",
                 str(self.root / "in"),
                 "-o",

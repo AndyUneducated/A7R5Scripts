@@ -4,7 +4,8 @@ import unittest
 
 from PIL import Image
 
-import batch_shrink
+from mediakit.cli import main as cli_main
+from mediakit.photo import shrink as batch_shrink
 
 
 def write_jpeg(path: pathlib.Path, size=(120, 80)) -> pathlib.Path:
@@ -156,8 +157,10 @@ class MainTest(unittest.TestCase):
         write_jpeg(self.root / "in" / "day2" / "a.jpg")
         write_jpeg(self.root / "in" / "._a.jpg")
 
-        code = batch_shrink.main(
+        code = cli_main(
             [
+                "photo",
+                "shrink",
                 str(self.root / "in"),
                 str(self.root / "out"),
                 "--out-format",
@@ -180,14 +183,16 @@ class MainTest(unittest.TestCase):
 
     def test_no_inputs(self):
         (self.root / "in").mkdir()
-        code = batch_shrink.main([str(self.root / "in"), str(self.root / "out")])
+        code = cli_main(["photo", "shrink", str(self.root / "in"), str(self.root / "out")])
         self.assertEqual(code, 1)
 
     def test_bad_quality_exits_with_two(self):
         (self.root / "in").mkdir()
         with self.assertRaises(SystemExit) as ctx:
-            batch_shrink.main(
+            cli_main(
                 [
+                    "photo",
+                    "shrink",
                     str(self.root / "in"),
                     str(self.root / "out"),
                     "--out-format",
@@ -202,8 +207,10 @@ class MainTest(unittest.TestCase):
         write_jpeg(self.root / "in" / "a.jpg")
         out = self.root / "in" / "out"
 
-        code = batch_shrink.main(
+        code = cli_main(
             [
+                "photo",
+                "shrink",
                 str(self.root / "in"),
                 str(out),
                 "--out-format",

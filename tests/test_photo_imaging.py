@@ -5,7 +5,7 @@ import unittest
 
 from PIL import ExifTags, Image
 
-from a7r5 import imaging
+from mediakit.photo import imaging
 
 ORIENTATION = 0x0112
 PIXEL_X = 0xA002

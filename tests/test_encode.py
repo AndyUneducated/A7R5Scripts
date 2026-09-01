@@ -1,6 +1,6 @@
 import pytest
 
-from vclip.encode import (
+from mediakit.video.encode import (
     _default_bitrate,
     build_plan,
     parse_resolution,

@@ -1,8 +1,8 @@
 """执行管线的共享契约：Plan（可描述 / 可执行的任务）与 Reporter（进度上报）。
 
-把"执行"与"表现（打印）"分离：Plan.execute 只负责跑 ffmpeg 并返回产物，
-过程中的进度通过 Reporter 上报，由调用方（CLI）决定如何呈现。这样领域层
-（split / merge）不再直接依赖 stdout，执行路径也更容易在测试里静默运行。
+把「执行」与「表现（打印）」分离：Plan.execute 只负责做事并返回产物，
+过程中的进度通过 Reporter 上报，由调用方（CLI）决定如何呈现。领域层
+不直接依赖 stdout，执行路径也更容易在测试里静默运行。
 """
 from __future__ import annotations
 

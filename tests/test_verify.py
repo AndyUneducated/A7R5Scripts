@@ -1,5 +1,5 @@
-import vclip.verify as V
-from vclip.verify import StreamCheck, VerifyReport, compare_sequences, verify_concat
+import mediakit.video.verify as V
+from mediakit.video.verify import StreamCheck, VerifyReport, compare_sequences, verify_concat
 
 
 def test_compare_identical():

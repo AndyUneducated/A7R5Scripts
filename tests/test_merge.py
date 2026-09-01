@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from vclip.merge import (
+from mediakit.video.merge import (
     _check_compatible,
     _default_output,
     _fatal_attrs,

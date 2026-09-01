@@ -1,6 +1,6 @@
 import unittest
 
-from a7r5 import timeshift
+from mediakit.time import timeshift
 
 
 class ParseOffsetTest(unittest.TestCase):

@@ -3,24 +3,30 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vclip"
-version = "0.5.0"
-description = "通用视频切分 / 重组工具：按大小或时长切分，或把片段无损拼回一个视频（支持 iPhone 4K/HDR 及各类视频）"
+name = "mediakit"
+version = "1.0.0"
+description = "照片压缩、视频切分/重组、拍摄时间修复"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "anning" }]
-keywords = ["ffmpeg", "video", "split", "merge", "concat", "hdr", "iphone"]
-dependencies = []
+keywords = ["photo", "video", "ffmpeg", "heif", "raw", "split", "merge", "exif"]
+dependencies = [
+    "Pillow>=10.0",
+    "pillow-heif>=0.15",
+    "rawpy>=0.19",
+    "tqdm>=4.65",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
 
 [project.scripts]
-vclip = "vclip.cli:main"
+mediakit = "mediakit.cli:main"
+vclip = "mediakit.cli:vclip_main"
 
-[tool.setuptools]
-packages = ["vclip"]
+[tool.setuptools.packages.find]
+include = ["mediakit*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

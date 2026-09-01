@@ -1,6 +1,8 @@
 import pytest
 
-from vclip.cli import build_parser, main
+from mediakit.cli import build_parser as root_parser
+from mediakit.cli import vclip_main
+from mediakit.cli.video import build_parser, main
 
 
 def test_parser_requires_subcommand():
@@ -60,3 +62,38 @@ def test_main_merge_too_few_returns_1(tmp_path):
     f = tmp_path / "only.mp4"
     f.write_bytes(b"x")
     assert main(["merge", str(f)]) == 1
+
+
+def test_split_duration_parses():
+    args = build_parser().parse_args(["split", "x.mp4", "--duration", "60"])
+    assert args.command == "split"
+    assert args.seconds == 60.0
+    assert args.target_mb is None
+
+
+def test_split_size_parses():
+    args = build_parser().parse_args(["split", "x.mp4", "--size", "200"])
+    assert args.command == "split"
+    assert args.target_mb == 200.0
+
+
+def test_split_profile_parses():
+    args = build_parser().parse_args(["split", "x.mp4", "--profile", "social"])
+    assert args.profile == "social"
+
+
+def test_root_parser_nests_video():
+    args = root_parser().parse_args(["video", "duration", "x.mp4", "-s", "10"])
+    assert args.domain == "video"
+    assert args.command == "duration"
+    assert args.seconds == 10.0
+
+
+def test_root_parser_nests_photo():
+    args = root_parser().parse_args(["photo", "shrink", "in", "out"])
+    assert args.domain == "photo"
+    assert args.photo_command == "shrink"
+
+
+def test_vclip_main_forwards_to_video():
+    assert vclip_main(["info", "/no/such/file_xyz.mp4"]) == 1

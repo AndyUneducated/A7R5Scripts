@@ -1,5 +1,5 @@
-from vclip.pipeline import ConsoleReporter, NullReporter
-from vclip.split import plan_duration
+from mediakit.core.pipeline import ConsoleReporter, NullReporter
+from mediakit.video.split import plan_duration
 from conftest import make_caps, make_opts, make_sdr_info
 
 
