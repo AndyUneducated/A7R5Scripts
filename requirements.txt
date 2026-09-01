@@ -1,0 +1,5 @@
+# Python 3.10+ required (PEP 604 type unions are used).
+Pillow>=10.0
+pillow-heif>=0.15
+rawpy>=0.19
+tqdm>=4.65
