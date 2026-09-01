@@ -1,187 +1,224 @@
-# batch_shrink.py 使用说明
+# A7R5Scripts
 
-输入目录：`input`  
-输出目录：`output`
+Sony A7R V 照片工作流脚本：
+
+- `batch_shrink.py`：批量压缩 / 转换照片格式（会重新编码像素）
+- `fix_photo_time.py`：批量修复照片与视频的时间 metadata（不重新编码像素）
+
+## 环境准备
+
+需要 Python 3.10 及以上（代码使用了 `X | None` 类型语法）。
+
+```bash
+pip install -r requirements.txt
+
+# fix_photo_time.py 额外需要 ExifTool
+brew install exiftool
+
+# 若 HEIF 读写报错，补装系统库
+brew install libheif
+```
+
+运行测试：
+
+```bash
+python -m pytest tests
+```
+
+## 仓库结构
+
+| 路径 | 说明 |
+|---|---|
+| `batch_shrink.py` | 压缩 / 格式转换 CLI |
+| `fix_photo_time.py` | 时间 metadata 修复 CLI |
+| `a7r5/imaging.py` | 解码、缩放、编码（含体积上限搜索） |
+| `a7r5/exifmeta.py` | EXIF 读取与改写 |
+| `a7r5/timeshift.py` | 时间偏移与时区解析 |
+| `a7r5/fsutil.py` | 目录扫描、路径映射、体积解析 |
+| `a7r5/progress.py` | 进度显示 |
+| `tests/` | 单元测试 |
+
+---
+
+# batch_shrink.py
 
 ## 功能概述
 
-`batch_shrink.py` 是一个用于 **批量压缩 / 转换照片格式的工具**，特别适用于 **Sony A7R V 等高像素相机照片的分享与归档**。
+用于 **批量压缩 / 转换照片格式**，适合高像素相机照片的分享与归档。
 
-脚本主要功能：
+处理流程：
 
-1. 递归扫描输入目录中的图片
-2. 解码 RAW / JPEG / HEIF 等格式
-3. 自动修正 EXIF Orientation（旋转方向）
-4. 按最长边缩放图片
-5. 转换为 **HEIF 或 JPEG**
-6. 并行处理以提升速度
-7. 写入输出目录
+1. 递归扫描输入目录（自动跳过隐藏文件与 `._xxx` AppleDouble 伴生文件）
+2. 解码 RAW / HEIF / JPEG / PNG
+3. 把 EXIF Orientation 烘进像素，并从写出的 EXIF 中移除该字段
+4. 透明图像合成到背景色，统一转 RGB
+5. 按最长边缩放，或按目标文件体积搜索最佳参数
+6. 编码为 HEIF 或 JPEG，**保留 EXIF 与 ICC**
+7. 按输入目录结构镜像写入输出目录
 
-该脚本 **会重新编码图像文件**，但不会改变图像内容，仅压缩或调整分辨率。
+该脚本会重新编码图像，但不改变画面内容，仅压缩或调整分辨率。
+
+## 支持的输入格式
+
+| 类型 | 扩展名 | 解码器 |
+|---|---|---|
+| Sony RAW | `.arw` | rawpy |
+| Sony HEIF | `.hif` `.hifc` | pillow-heif |
+| HEIF / HEIC | `.heif` `.heic` | pillow-heif |
+| JPEG | `.jpg` `.jpeg` | Pillow |
+| PNG | `.png` | Pillow |
+
+输出格式为 HEIF（默认，扩展名 `.heic`）或 JPEG。
+
+## 输出目录与命名
+
+输出**镜像输入目录结构**，`in/day1/DSC1.ARW` → `out/day1/DSC1.arw.heic`。
+
+| `--naming` | 结果 | 说明 |
+|---|---|---|
+| `source-ext`（默认） | `DSC1.arw.heic` | 名字里保留源扩展名，同一目录下的 `DSC1.ARW` 与 `DSC1.JPG` 不会撞名 |
+| `plain` | `DSC1.heic` | 名字更干净；若检测到撞名，会自动回退为 `source-ext` 形式并打印 WARNING |
+
+## 元数据
+
+| 输出格式 | EXIF | ICC |
+|---|---|---|
+| HEIF | 保留 | 保留 |
+| JPEG | 保留 | 保留 |
+
+- RAW 本身经 rawpy 解码后不携带 metadata，脚本会从 **ARW 内嵌 JPEG 预览** 中提取 EXIF 复用，因此拍摄时间、机身、镜头、曝光参数、GPS 都会保留。
+- 写出的 EXIF 会移除 Orientation（方向已烘进像素），并把 `PixelXDimension` / `PixelYDimension` 改为实际输出尺寸。
+- MakerNote 依赖文件内的绝对偏移，重写后必然失效，因此会被丢弃（镜头型号等信息在标准 EXIF 字段中，不受影响）。
+- 用 `--strip` 可以不写任何 EXIF 与 ICC。
+
+## 参数说明
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `in_dir` | 必需 | 输入目录，递归扫描 |
+| `out_dir` | 必需 | 输出目录，镜像输入结构；若位于输入目录内部会自动排除 |
+| `--out-format` | `heif` | 输出格式：`heif` 或 `jpg` |
+| `--max-edge` | `6000` | 输出最长边像素；设置了 `--max-size` 时默认不限制 |
+| `--quality` | `80` | JPEG 为 1–95，HEIF 为 1–100；设置了 `--max-size` 时默认取上限 |
+| `--max-size` | 无 | 输出体积上限（如 `3mb`，二进制单位）。在内存中搜索能放进该体积的最佳编码 |
+| `--subsampling` | `auto` | 仅 JPEG。`auto` 按质量选 4:4:4 / 4:2:2 / 4:2:0，也可显式指定 `444` `422` `420` |
+| `--raw-wb` | `camera` | 仅 RAW。`camera` 用相机白平衡（与机内 JPEG 一致），`auto` 自动白平衡，`none` 不做白平衡 |
+| `--raw-half-size` | 关闭 | 仅 RAW。半分辨率解码，输出尺寸不大时能快数倍 |
+| `--naming` | `source-ext` | 输出文件命名方式，见上文 |
+| `--strip` | 关闭 | 不写 EXIF 与 ICC |
+| `--bg` | `white` | 透明图像背景色：`white` / `black` / `R,G,B` |
+| `--workers` | CPU 核数（上限 8） | 并行进程数。一张 A7R V RAW 每进程约需 200 MB 内存 |
+| `--overwrite` | 关闭 | 覆盖已存在的输出，默认跳过 |
+
+`--max-size` 的搜索策略是**先降质量、再降分辨率**：优先保住像素，只有连最低质量都超标时才缩小尺寸，且每次缩放都从原图重采样。所有尝试都在内存中完成，最终结果通过临时文件原子写入，中断不会留下半成品。
+
+退出码：`0` 成功，`1` 没有可处理文件，`2` 参数错误，`3` HEIF 不可用，`10` 有文件失败，`130` 被中断。
+
+## 命令示例
+
+| 场景 | 命令 |
+|---|---|
+| 默认压缩为 HEIF | `python batch_shrink.py input output` |
+| 社交媒体尺寸 | `python batch_shrink.py input output --max-edge 4096` |
+| 高压缩版本 | `python batch_shrink.py input output --max-edge 2048 --quality 70` |
+| 输出 JPEG | `python batch_shrink.py input output --out-format jpg` |
+| 限制单文件 3 MB | `python batch_shrink.py input output --out-format jpg --max-size 3mb` |
+| 高质量归档 | `python batch_shrink.py input output --max-edge 6000 --quality 90` |
+| 手机分享版本 | `python batch_shrink.py input output --max-edge 2048 --quality 75` |
+| 微信传播（JPEG，兼容安卓） | `python batch_shrink.py input output --out-format jpg --max-edge 3072 --max-size 3mb` |
+| RAW 快速预览 | `python batch_shrink.py input output --max-edge 2048 --raw-half-size` |
+| 去掉全部元数据 | `python batch_shrink.py input output --out-format jpg --strip` |
+
+---
+
+# fix_photo_time.py
+
+## 功能概述
+
+用于**批量修复照片与视频的时间 metadata**，适用于相机时间设置错误、夏令时（DST）未开启、时区设置错误等场景。
+
+它通过 ExifTool 修改时间相关 metadata，**不会改变图像或视频的像素数据**。
+
+处理流程：
+
+1. 递归扫描输入目录（跳过隐藏文件与 `._xxx`）
+2. 复制到输出目录并保持目录结构（`--in-place` 则直接改原文件）
+3. 按文件类型分批调用 ExifTool 平移 metadata 时间，并可写入 EXIF 时区
+4. 再跑一遍，把文件系统时间设为修正后的拍摄时间
 
 ## 支持的文件类型
-
-脚本默认支持以下格式：
 
 | 类型 | 扩展名 |
 |---|---|
-|Sony RAW | `.arw` |
-|Sony HEIF | `.hif` `.hifc` |
-|HEIF | `.heif` |
-|HEIC | `.heic` |
-|JPEG | `.jpg` `.jpeg` |
-|PNG | `.png` |
+| 图片 | `.arw` `.dng` `.hif` `.heif` `.heic` `.jpg` `.jpeg` `.tif` `.tiff` |
+| 视频 | `.mp4` `.mov` `.m4v` |
 
-说明：
-
-- `.arw` 使用 **rawpy** 解码
-- `.heic / .heif / .hif` 使用 **pillow-heif**
-- `.jpg / .png` 使用 **Pillow**
-
-## 输出文件格式
-
-支持两种输出格式：
-
-| 格式 | 说明 |
-|---|---|
-|HEIF | 默认输出格式，压缩率高 |
-|JPEG | 兼容性最高 |
-
-默认输出扩展名为 **`.heic`**。
-
-## 图像处理流程
-
-每张图片处理步骤：
-
-1. 解码图像（RAW / HEIF / JPEG）
-2. 自动修正 EXIF Orientation
-3. 处理透明图像（PNG / HEIF alpha）
-4. 转换为 RGB
-5. 按最长边缩放
-6. 编码为 HEIF 或 JPEG
-
-## 参数说明
-
-| 参数 | 是否必需 | 默认值 | 示例 | 说明 |
-|---|---|---|---|---|
-| `in_dir` | 是 | 无 | `input` | 输入目录，脚本会递归扫描该目录中的所有支持格式文件 |
-| `out_dir` | 是 | 无 | `output` | 输出目录，处理后的文件会写入该目录 |
-| `--out-format` | 否 | `heif` | `--out-format jpg` | 输出格式，可选 `heif` 或 `jpg` |
-| `--max-edge` | 否 | `6000` | `--max-edge 4096` | 输出图片最长边像素，超过该值会等比例缩放 |
-| `--quality` | 否 | `80` | `--quality 85` | 输出质量，JPEG 为 1–95，HEIF 为 1–100 |
-| `--bg` | 否 | `white` | `--bg 255,255,255` | 透明图片背景颜色，可为 `white`、`black` 或 `R,G,B` |
-| `--workers` | 否 | CPU 核心数 | `--workers 8` | 并行处理进程数量 |
-| `--overwrite` | 否 | `false` | `--overwrite` | 若输出文件已存在，则覆盖 |
-| `--strip` | 否 | `false` | `--strip` | （仅 JPEG）删除所有 EXIF metadata |
-| `--keep-orientation-only` | 否 | `false` | `--keep-orientation-only` | （仅 JPEG）仅保留 EXIF Orientation 字段 |
-
-## 命令示例
-
-| 场景 | 命令 |
-|---|---|
-|默认压缩为 HEIF | `python batch_shrink.py input output` |
-|生成社交媒体尺寸（4096px） | `python batch_shrink.py input output --max-edge 4096` |
-|高压缩版本 | `python batch_shrink.py input output --max-edge 2048 --quality 70` |
-|输出 JPEG | `python batch_shrink.py input output --out-format jpg` |
-|覆盖已有文件 | `python batch_shrink.py input output --overwrite` |
-|指定并行进程 | `python batch_shrink.py input output --workers 8` |
-|指定背景颜色 | `python batch_shrink.py input output --bg 255,255,255` |
-|高质量归档 | `python batch_shrink.py input output --max-edge 6000 --quality 85` |
-|社交媒体推荐参数 | `python batch_shrink.py input output --max-edge 4096 --quality 80 --workers 8` |
-|手机分享版本 | `python batch_shrink.py input output --max-edge 2048 --quality 75` |
-|微信传播（JPEG，兼容安卓） | `python batch_shrink.py input output --out-format jpg --max-edge 3072 --quality 85 --strip` |
-
-# fix_photo_time.py 使用说明
-
-输入目录：`input`  
-输出目录：`output`
-
-## 功能概述
-
-`fix_photo_time.py` 是一个用于**批量修复照片与视频时间 metadata 的工具**。  
-它通过调用 **ExifTool** 修改文件中的时间相关 metadata，而**不会改变图像或视频的像素数据**。
-
-该脚本适用于相机时间设置错误、夏令时（DST）未开启、时区设置错误等场景。
-
-脚本工作流程：
-
-1. 递归扫描输入目录中的文件
-2. 将文件复制到输出目录（保持原有目录结构）
-3. 使用 ExifTool 修改 metadata 时间
-4. 同步更新 EXIF、XMP、文件系统时间等信息
-5. 可选更新 EXIF 时区字段
-
-整个过程 **不会重新编码图像或视频数据**，仅修改 metadata。
-
-## 支持的文件类型
-
-脚本默认支持以下格式：
-
-|类型|扩展名|
-|---|---|
-Sony RAW | `.arw` |
-Sony HEIF | `.hif` |
-HEIF | `.heif` |
-HEIC | `.heic` |
-JPEG | `.jpg` `.jpeg` |
-Video | `.mp4` |
-
-可通过 `--ext` 参数扩展支持其他格式。
+可通过 `--ext` 追加其他扩展名。
 
 ## 修改的 metadata 字段
 
-脚本会同步更新多个时间字段，以确保不同软件（Lightroom / Capture One / Finder 等）显示一致。
+图片：
 
-### EXIF
+- EXIF：`DateTimeOriginal`、`CreateDate`、`ModifyDate`（即 `AllDates`）
+- EXIF 时区（仅 `--set-offset`）：`OffsetTime`、`OffsetTimeOriginal`、`OffsetTimeDigitized`
+- XMP：`CreateDate`、`ModifyDate`、`DateCreated`
+- 预览图：`IFD1:ModifyDate`
 
-- DateTimeOriginal
-- CreateDate
-- ModifyDate
-- OffsetTime
-- OffsetTimeOriginal
-- OffsetTimeDigitized
+视频：
 
-### XMP
+- QuickTime：`AllDates`、`TrackCreateDate`、`TrackModifyDate`、`MediaCreateDate`、`MediaModifyDate`
+- XMP：`CreateDate`、`ModifyDate`
 
-- CreateDate
-- ModifyDate
-- DateCreated
+文件系统时间（除非 `--no-file-times`）：
 
-### 文件系统时间
-
-- FileModifyDate
-- FileCreateDate
-
-### 预览图 metadata
-
-- IFD1:ModifyDate
+- `FileModifyDate`、`FileCreateDate`，取值来自修正后的拍摄时间。
+  直接平移这两个字段会平移"复制文件的时刻"，所以这里是从 metadata 反写的。
 
 ## 参数说明
 
-| 参数 | 是否必需 | 示例 | 说明 |
-|---|---|---|---|
-| `-i`, `--input` | 必需 | `-i input` | 输入目录。脚本会递归扫描该目录中的文件。 |
-| `-o`, `--output` | 可选 | `-o output` | 输出目录。处理后的文件会写入该目录，并保持原有目录结构。默认 `output`。 |
-| `--shift` | 可选 | `--shift=+01:00:00` | 手动时间偏移。格式 `±HH:MM:SS`。例如 `+01:00:00` 或 `-00:30:00`。 |
-| `--from-offset` | 可选 | `--from-offset=-08:00` | 原始时区偏移。格式 `±HH:MM`。通常表示相机错误记录的时区。 |
-| `--to-offset` | 可选 | `--to-offset=-07:00` | 目标时区偏移。脚本会自动计算时间差：`to-offset - from-offset`。 |
-| `--set-offset` | 可选 | `--set-offset=-07:00` | 写入新的 EXIF 时区字段。会更新 `OffsetTime`、`OffsetTimeOriginal`、`OffsetTimeDigitized`。 |
-| `--ext` | 可选 | `--ext=mov` | 额外处理的文件扩展名。可重复使用，例如 `--ext=mov --ext=avi`。 |
-| `--dry-run` | 可选 | `--dry-run` | 仅打印 ExifTool 命令，不修改文件。用于验证参数。 |
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `-i`, `--input` | 必需 | 输入目录，递归扫描 |
+| `-o`, `--output` | `output` | 输出目录，镜像输入结构 |
+| `--in-place` | 关闭 | 直接修改输入文件，不复制。避免 RAW 库占用双倍磁盘 |
+| `--shift` | 无 | 手动时间偏移，格式 `±HH:MM:SS`，秒会被正确处理 |
+| `--from-offset` | 无 | 原始时区偏移，格式 `±HH:MM` |
+| `--to-offset` | 无 | 目标时区偏移，偏移量按 `to - from` 计算 |
+| `--set-offset` | 无 | 写入 EXIF 时区字段（仅图片） |
+| `--ext` | 无 | 追加处理的扩展名，可重复 |
+| `--no-file-times` | 关闭 | 不修改文件系统时间 |
+| `--workers` | `4` | 并行复制 / ExifTool 任务数 |
+| `--dry-run` | 关闭 | 只打印将执行的 ExifTool 命令，**不复制也不修改任何文件** |
+
+注意：
+
+- **时区偏移必须带符号**。`10:00` 会直接报错而不是被猜成某个值。
+- argparse 无法把以 `-` 开头的值当作参数值，所以负偏移要写成 `--from-offset=-08:00` 这种带等号的形式。
+- 偏移量为 0 且没有 `--set-offset` 时，脚本会报错退出，因为没有任何事情要做。
+
+退出码：`0` 成功，`1` 没有匹配文件，`2` 参数错误，`10` 有文件失败，`130` 被中断。
 
 ## 命令示例
 
 | 场景 | 命令 |
 |---|---|
-|修复 DST（相机记录为 UTC-8，但实际为 UTC-7） | `python fix_photo_time.py -i input -o output --from-offset=-08:00 --to-offset=-07:00 --set-offset=-07:00` |
-|时区转换（东京 UTC+9 → 美国西海岸 UTC-7） | `python fix_photo_time.py -i input -o output --from-offset=+09:00 --to-offset=-07:00 --set-offset=-07:00` |
-|手动偏移 +1 小时（典型 DST 修复） | `python fix_photo_time.py -i input -o output --shift=+01:00:00 --set-offset=-07:00` |
-|手动偏移 -30 分钟 | `python fix_photo_time.py -i input -o output --shift=-00:30:00` |
-|只修改 EXIF 时区（不改变时间） | `python fix_photo_time.py -i input -o output --shift=+00:00:00 --set-offset=-07:00` |
-|Dry Run（仅查看将执行的 ExifTool 命令，不实际修改） | `python fix_photo_time.py -i input -o output --shift=+01:00:00 --set-offset=-07:00 --dry-run` |
+| 修复 DST（相机记为 UTC-8，实际 UTC-7） | `python fix_photo_time.py -i input -o output --from-offset=-08:00 --to-offset=-07:00 --set-offset=-07:00` |
+| 时区转换（东京 UTC+9 → 美西 UTC-7） | `python fix_photo_time.py -i input -o output --from-offset=+09:00 --to-offset=-07:00 --set-offset=-07:00` |
+| 手动偏移 +1 小时 | `python fix_photo_time.py -i input -o output --shift=+01:00:00 --set-offset=-07:00` |
+| 手动偏移 -30 分 15 秒 | `python fix_photo_time.py -i input -o output --shift=-00:30:15` |
+| 只写 EXIF 时区，不改时间 | `python fix_photo_time.py -i input -o output --shift=+00:00:00 --set-offset=-07:00` |
+| 原地修改，不复制 | `python fix_photo_time.py -i input --in-place --shift=+01:00:00` |
+| Dry Run | `python fix_photo_time.py -i input -o output --shift=+01:00:00 --dry-run` |
 
 ## 结果验证
 
 ```bash
 exiftool -time:all -a -G1 -s DSC05267.ARW
 ```
+
+## 关于 ExifTool 的偏移写法
+
+脚本生成的是 `+=0:0:0 1:00:00` 这种 `Y:M:D h:m:s` 完整写法，而不是 `+=1:00:00`。
+ExifTool 对只给一个参数的写法会按值的类型来猜：`1:00:00` 作用在 date/time 值上是"1 小时"，
+但作用在只有日期的值（例如某些文件的 `XMP:DateCreated`）上会被理解为"1 年"。
+写全两段可以消除这种歧义。
